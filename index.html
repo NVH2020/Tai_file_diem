@@ -1,224 +1,170 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tra Cứu Điểm Thi</title>
-    <!-- Tích hợp Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tích hợp Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Custom spinner animation */
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: #09f;
-            animation: spin 1s ease infinite;
-        }
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Xuất kết quả thi ra Excel</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; margin: 0; }
+    .card { max-width: 600px; width: 100%; background-color: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -2px rgba(0,0,0,.05); }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-top: 0; }
+    .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    label { font-weight: 500; }
+    input[type="text"] { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
+    input[type="text"]:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+    .btn { padding: 10px 16px; border-radius: 8px; border: none; background-color: #1f2937; color: white; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+    .btn:hover { background-color: #374151; }
+    .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+    .muted { color: #6b7280; font-size: 0.875rem; margin-top: 8px;}
+    .note { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; padding: 16px; font-size: 0.875rem; margin-top: 24px; }
+  </style>
 
-    <div class="w-full max-w-md mx-auto bg-white rounded-xl shadow-lg p-8">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-gray-800">Tra Cứu Điểm Thi(Kiểm Tra)</h1>
-            <p class="text-gray-500 mt-2">Nhập thông tin để xem kết quả bài thi của bạn.</p>
-        </div>
+  <!-- Thư viện SheetJS để tạo file Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-        <!-- Form nhập thông tin -->
-        <div class="space-y-4">
-            <div>
-                <label for="studentId" class="block text-sm font-medium text-gray-700">Mã học sinh</label>
-                <input type="text" id="studentId" name="studentId" placeholder="Ví dụ: 540101" class="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-            </div>
-            <div>
-                <label for="examCode" class="block text-sm font-medium text-gray-700">Mã kỳ thi(Kiểm tra)</label>
-                <input type="text" id="examCode" name="examCode" placeholder="Ví dụ: Toan09_001" class="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-            </div>
-            <button id="lookupButton" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 ease-in-out flex items-center justify-center">
-                <span id="button-text">Tra cứu</span>
-                <div id="loading-spinner" class="spinner hidden ml-3"></div>
-            </button>
-        </div>
+  <!-- Thư viện Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        <!-- Khu vực hiển thị kết quả -->
-        <div id="result-container" class="mt-8 hidden">
-             <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg">
-                <div class="flex">
-                    <div class="py-1">
-                        <svg class="h-6 w-6 text-green-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-800 mb-2">Kết quả bài thi</h2>
-                        <div id="result-content" class="text-gray-700 space-y-2">
-                           <!-- Dữ liệu kết quả sẽ được chèn vào đây -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    // ==================================================================
+    // === 🔧 BƯỚC 1: DÁN CẤU HÌNH FIREBASE CỦA BẠN VÀO ĐÂY ===
+    // ==================================================================
+    // (Tôi đã điền sẵn cấu hình từ file cũ của bạn, hãy đảm bảo nó đúng)
+    const firebaseConfig = {
+  	apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
+  	authDomain: "toanthayha-cd96c.firebaseapp.com",
+  	projectId: "toanthayha-cd96c",
+  	storageBucket: "toanthayha-cd96c.firebasestorage.app",
+  	messagingSenderId: "940207284081",
+  	appId: "1:940207284081:web:9801158f72cc14053ae0d0",
+  	measurementId: "G-9D5ZQ66BSB"
+	};
+    // ==================================================================
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function fetchRows(quizId) {
+      const colRef = collection(db, "quizResults");
+      const q = quizId 
+          ? query(colRef, where("quizId", "==", quizId))
+          : query(colRef); // Lấy tất cả nếu không có quizId
+
+      const snapshot = await getDocs(q);
+      const rows = [];
+      snapshot.forEach(doc => {
+        const d = doc.data() || {};
         
-        <!-- Khu vực hiển thị lỗi -->
-        <div id="error-container" class="mt-6 hidden">
-            <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
-                <div class="flex">
-                    <div class="py-1">
-                        <svg class="h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <p id="error-message" class="text-sm font-medium text-red-800"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- Firebase SDK -->
-    <script type="module">
-        // Import các hàm cần thiết từ Firebase SDK
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Cấu hình Firebase của bạn
-        const firebaseConfig = {
-            apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
-            authDomain: "toanthayha-cd96c.firebaseapp.com",
-            projectId: "toanthayha-cd96c",
-            storageBucket: "toanthayha-cd96c.firebasestorage.app",
-            messagingSenderId: "940207284081",
-            appId: "1:940207284081:web:9801158f72cc14053ae0d0",
-            measurementId: "G-9D5ZQ66BSB"
-        };
-
-        // Khởi tạo Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // Lấy các element từ DOM
-        const studentIdInput = document.getElementById('studentId');
-        const examCodeInput = document.getElementById('examCode');
-        const lookupButton = document.getElementById('lookupButton');
-        const resultContainer = document.getElementById('result-container');
-        const resultContent = document.getElementById('result-content');
-        const errorContainer = document.getElementById('error-container');
-        const errorMessage = document.getElementById('error-message');
-        const buttonText = document.getElementById('button-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
-
-
-        // Hàm định dạng thời gian
-        function formatTimestamp(timestamp) {
-            if (timestamp && timestamp.seconds) {
-                const date = new Date(timestamp.seconds * 1000);
-                 return date.toLocaleString('vi-VN', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-            }
-            return 'Không có thông tin';
-        }
-
-        // Hàm xử lý tra cứu
-        async function handleLookup() {
-            const studentId = studentIdInput.value.trim();
-            const examCode = examCodeInput.value.trim();
-
-            // Ẩn kết quả và lỗi cũ
-            resultContainer.classList.add('hidden');
-            errorContainer.classList.add('hidden');
-
-            // Kiểm tra đầu vào
-            if (!studentId || !examCode) {
-                errorMessage.textContent = 'Vui lòng nhập đầy đủ mã học sinh và mã kỳ thi.';
-                errorContainer.classList.remove('hidden');
-                return;
-            }
-
-            // Hiển thị trạng thái đang tải
-            buttonText.textContent = 'Đang tìm kiếm...';
-            loadingSpinner.classList.remove('hidden');
-            lookupButton.disabled = true;
-
+        // Xử lý ngày tháng an toàn hơn
+        let submittedAt = "";
+        if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
             try {
-                // Tạo câu truy vấn Firestore
-                const q = query(collection(db, "quizResults"), 
-                              where("studentId", "==", studentId), 
-                              where("examCode", "==", examCode));
-
-                const querySnapshot = await getDocs(q);
-
-                if (querySnapshot.empty) {
-                    errorMessage.textContent = 'Không tìm thấy kết quả. Vui lòng kiểm tra lại mã học sinh và mã kỳ thi.';
-                    errorContainer.classList.remove('hidden');
-                } else {
-                    // Chỉ lấy kết quả đầu tiên tìm thấy
-                    const doc = querySnapshot.docs[0];
-                    const data = doc.data();
-
-                    // Hiển thị kết quả
-                    resultContent.innerHTML = `
-                        <p><strong>Họ và tên:</strong> ${data.fullname || 'N/A'}</p>
-                        <p><strong>Lớp:</strong> ${data.className || 'N/A'}</p>
-                        <p><strong>Trường:</strong> ${data.school || 'N/A'}</p>
-                        <p><strong>Điểm số:</strong> <span class="font-bold text-xl text-blue-600">${data.score !== undefined ? data.score : 'N/A'}</span></p>
-                        <p><strong>Thời gian nộp bài:</strong> ${formatTimestamp(data.submittedAt)}</p>
-                    `;
-                    resultContainer.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error("Lỗi khi truy vấn Firestore: ", error);
-                errorMessage.textContent = 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
-                errorContainer.classList.remove('hidden');
-            } finally {
-                // Khôi phục lại trạng thái nút bấm
-                buttonText.textContent = 'Tra cứu';
-                loadingSpinner.classList.add('hidden');
-                lookupButton.disabled = false;
+                submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+            } catch (e) {
+                console.warn("Could not format date for doc:", doc.id, e);
             }
         }
+
+        rows.push({
+          "Mã bài": d.examCode || "",
+	  "QuizId": d.quizId || "",
+          "SBD": d.studentId || d.id || "",
+          "Họ và tên": d.fullname || "",
+          "Lớp": d.className || d.class || "",
+          "Trường": d.school || "",
+          "Điểm": typeof d.score === "number" ? d.score : "",
+          "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
+          "Ngày nộp": submittedAt,
+          "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
+        });
+      });
+      
+      return rows;
+    }
+
+    function autoFitColumns(ws, data) {
+        const colWidths = [];
+        const header = Object.keys(data[0] || {});
         
-        // Gán sự kiện click cho nút tra cứu
-        lookupButton.addEventListener('click', handleLookup);
-
-        // Cho phép nhấn Enter để tra cứu
-        studentIdInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                handleLookup();
-            }
+        header.forEach((h, i) => {
+            let maxLen = h.length;
+            data.forEach(row => {
+                const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
+                if (val.length > maxLen) {
+                    maxLen = val.length;
+                }
+            });
+            colWidths[i] = { wch: maxLen + 2 };
         });
+        ws["!cols"] = colWidths;
+    }
 
-        examCodeInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                handleLookup();
+    async function exportExcel() {
+      const btn = document.getElementById("exportBtn");
+      const quizId = document.getElementById("quizIdInput").value.trim();
+      
+      btn.disabled = true;
+      btn.textContent = "Đang lấy dữ liệu...";
+
+      try {
+        const rows = await fetchRows(quizId);
+        
+        if (rows.length === 0) {
+          alert("Không tìm thấy kết quả nào. Vui lòng kiểm tra lại 'Mã Đề' hoặc đảm bảo đã có học sinh nộp bài.");
+          return;
+        }
+
+        btn.textContent = "Đang tạo file...";
+
+        // Sắp xếp lại dữ liệu theo ngày nộp mới nhất
+        rows.sort((a, b) => new Date(b["Ngày nộp"]) - new Date(a["Ngày nộp"]));
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        autoFitColumns(ws, rows);
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "KetQuaThi");
+        
+        const filename = quizId ? `KetQua_${quizId}.xlsx` : 'KetQua_TatCa.xlsx';
+        XLSX.writeFile(wb, filename);
+
+      } catch (err) {
+        console.error("Lỗi khi xuất Excel:", err);
+        alert("Đã xảy ra lỗi: " + err.message + ". Hãy kiểm tra lại Quy tắc bảo mật (Rules) trong Firestore của bạn.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Xuất ra Excel";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("exportBtn").addEventListener("click", exportExcel);
+    });
+  </script>
+</head>
+<body>
+  <div class="card">
+    <h2>Xuất kết quả thi ra Excel!</h2>
+        
+    <div class="field">
+      <label for="quizIdInput">Lọc theo QuizId: toanthayha_lop</label>
+      <input type="text" id="quizIdInput" placeholder="Ví dụ: toanthayha_09"/>
+    </div>
+    
+    <button id="exportBtn" class="btn">TẢI FILE</button>
+
+    <div class="note">
+        <b>Quan trọng:</b> Nếu bạn gặp lỗi "permission-denied" (quyền bị từ chối), hãy vào dự án Firebase của bạn, chọn <b>Firestore Database</b> > <b>Rules</b> và đảm bảo quy tắc của bạn cho phép đọc dữ liệu, ví dụ:
+        <br>
+        <code>
+            match /databases/{database}/documents { <br>
+            &nbsp;&nbsp;match /{document=**} { <br>
+            &nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true; <br>
+            &nbsp;&nbsp;} <br>
             }
-        });
-
-    </script>
+        </code>
+    </div>
+  </div>
 </body>
 </html>
-
