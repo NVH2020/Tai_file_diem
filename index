@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tra Cứu Điểm Thi</title>
+    <!-- Tích hợp Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tích hợp Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom spinner animation */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-md mx-auto bg-white rounded-xl shadow-lg p-8">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Tra Cứu Điểm Thi(Kiểm Tra)</h1>
+            <p class="text-gray-500 mt-2">Nhập thông tin để xem kết quả bài thi của bạn.</p>
+        </div>
+
+        <!-- Form nhập thông tin -->
+        <div class="space-y-4">
+            <div>
+                <label for="studentId" class="block text-sm font-medium text-gray-700">Mã học sinh</label>
+                <input type="text" id="studentId" name="studentId" placeholder="Ví dụ: 540101" class="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+            <div>
+                <label for="examCode" class="block text-sm font-medium text-gray-700">Mã kỳ thi(Kiểm tra)</label>
+                <input type="text" id="examCode" name="examCode" placeholder="Ví dụ: Toan09_001" class="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+            <button id="lookupButton" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 ease-in-out flex items-center justify-center">
+                <span id="button-text">Tra cứu</span>
+                <div id="loading-spinner" class="spinner hidden ml-3"></div>
+            </button>
+        </div>
+
+        <!-- Khu vực hiển thị kết quả -->
+        <div id="result-container" class="mt-8 hidden">
+             <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg">
+                <div class="flex">
+                    <div class="py-1">
+                        <svg class="h-6 w-6 text-green-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 mb-2">Kết quả bài thi</h2>
+                        <div id="result-content" class="text-gray-700 space-y-2">
+                           <!-- Dữ liệu kết quả sẽ được chèn vào đây -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Khu vực hiển thị lỗi -->
+        <div id="error-container" class="mt-6 hidden">
+            <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
+                <div class="flex">
+                    <div class="py-1">
+                        <svg class="h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p id="error-message" class="text-sm font-medium text-red-800"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import các hàm cần thiết từ Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Cấu hình Firebase của bạn
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
+            authDomain: "toanthayha-cd96c.firebaseapp.com",
+            projectId: "toanthayha-cd96c",
+            storageBucket: "toanthayha-cd96c.firebasestorage.app",
+            messagingSenderId: "940207284081",
+            appId: "1:940207284081:web:9801158f72cc14053ae0d0",
+            measurementId: "G-9D5ZQ66BSB"
+        };
+
+        // Khởi tạo Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Lấy các element từ DOM
+        const studentIdInput = document.getElementById('studentId');
+        const examCodeInput = document.getElementById('examCode');
+        const lookupButton = document.getElementById('lookupButton');
+        const resultContainer = document.getElementById('result-container');
+        const resultContent = document.getElementById('result-content');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+
+        // Hàm định dạng thời gian
+        function formatTimestamp(timestamp) {
+            if (timestamp && timestamp.seconds) {
+                const date = new Date(timestamp.seconds * 1000);
+                 return date.toLocaleString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+            return 'Không có thông tin';
+        }
+
+        // Hàm xử lý tra cứu
+        async function handleLookup() {
+            const studentId = studentIdInput.value.trim();
+            const examCode = examCodeInput.value.trim();
+
+            // Ẩn kết quả và lỗi cũ
+            resultContainer.classList.add('hidden');
+            errorContainer.classList.add('hidden');
+
+            // Kiểm tra đầu vào
+            if (!studentId || !examCode) {
+                errorMessage.textContent = 'Vui lòng nhập đầy đủ mã học sinh và mã kỳ thi.';
+                errorContainer.classList.remove('hidden');
+                return;
+            }
+
+            // Hiển thị trạng thái đang tải
+            buttonText.textContent = 'Đang tìm kiếm...';
+            loadingSpinner.classList.remove('hidden');
+            lookupButton.disabled = true;
+
+            try {
+                // Tạo câu truy vấn Firestore
+                const q = query(collection(db, "quizResults"), 
+                              where("studentId", "==", studentId), 
+                              where("examCode", "==", examCode));
+
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    errorMessage.textContent = 'Không tìm thấy kết quả. Vui lòng kiểm tra lại mã học sinh và mã kỳ thi.';
+                    errorContainer.classList.remove('hidden');
+                } else {
+                    // Chỉ lấy kết quả đầu tiên tìm thấy
+                    const doc = querySnapshot.docs[0];
+                    const data = doc.data();
+
+                    // Hiển thị kết quả
+                    resultContent.innerHTML = `
+                        <p><strong>Họ và tên:</strong> ${data.fullname || 'N/A'}</p>
+                        <p><strong>Lớp:</strong> ${data.className || 'N/A'}</p>
+                        <p><strong>Trường:</strong> ${data.school || 'N/A'}</p>
+                        <p><strong>Điểm số:</strong> <span class="font-bold text-xl text-blue-600">${data.score !== undefined ? data.score : 'N/A'}</span></p>
+                        <p><strong>Thời gian nộp bài:</strong> ${formatTimestamp(data.submittedAt)}</p>
+                    `;
+                    resultContainer.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Lỗi khi truy vấn Firestore: ", error);
+                errorMessage.textContent = 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+                errorContainer.classList.remove('hidden');
+            } finally {
+                // Khôi phục lại trạng thái nút bấm
+                buttonText.textContent = 'Tra cứu';
+                loadingSpinner.classList.add('hidden');
+                lookupButton.disabled = false;
+            }
+        }
+        
+        // Gán sự kiện click cho nút tra cứu
+        lookupButton.addEventListener('click', handleLookup);
+
+        // Cho phép nhấn Enter để tra cứu
+        studentIdInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                handleLookup();
+            }
+        });
+
+        examCodeInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                handleLookup();
+            }
+        });
+
+    </script>
+</body>
+</html>
+
