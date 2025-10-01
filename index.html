@@ -1,74 +1,33 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Xuất kết quả thi ra Excel</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; margin: 0; }
-    .card { max-width: 600px; width: 100%; background-color: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -2px rgba(0,0,0,.05); }
-    h2 { font-size: 1.5rem; font-weight: 600; margin-top: 0; }
-    .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-    label { font-weight: 500; }
-    input[type="text"] { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
-    input[type="text"]:focus { outline: 2px solid #3b82f6; border-color: transparent; }
-    .btn { padding: 10px 16px; border-radius: 8px; border: none; background-color: #1f2937; color: white; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-    .btn:hover { background-color: #374151; }
-    .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
-    .muted { color: #6b7280; font-size: 0.875rem; margin-top: 8px;}
-    .note { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; padding: 16px; font-size: 0.875rem; margin-top: 24px; }
-  </style>
-
-  <!-- Thư viện SheetJS để tạo file Excel -->
+  <meta charset="UTF-8">
+  <title>Xuất Excel</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <button onclick="exportExcel()">Xuất Excel</button>
 
-  <!-- Thư viện Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    // ==================================================================
-    // === 🔧 BƯỚC 1: DÁN CẤU HÌNH FIREBASE CỦA BẠN VÀO ĐÂY ===
-    // ==================================================================
-    // (Tôi đã điền sẵn cấu hình từ file cũ của bạn, hãy đảm bảo nó đúng)
+  <script>
+    // 🔹 Cấu hình Firebase của bạn
     const firebaseConfig = {
-  	apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
-  	authDomain: "toanthayha-cd96c.firebaseapp.com",
-  	projectId: "toanthayha-cd96c",
-  	storageBucket: "toanthayha-cd96c.firebasestorage.app",
-  	messagingSenderId: "940207284081",
-  	appId: "1:940207284081:web:9801158f72cc14053ae0d0",
-  	measurementId: "G-9D5ZQ66BSB"
-	};
-    // ==================================================================
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID"
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    async function fetchRows(quizId) {
-      const colRef = collection(db, "quizResults");
-      const q = quizId 
-          ? query(colRef, where("quizId", "==", quizId))
-          : query(colRef); // Lấy tất cả nếu không có quizId
-
-      const snapshot = await getDocs(q);
-      const rows = [];
+    async function fetchRows() {
+      const snapshot = await db.collection("KetQua").get();
+      let rows = [];
       snapshot.forEach(doc => {
-        const d = doc.data() || {};
-        
-        // Xử lý ngày tháng an toàn hơn
-        let submittedAt = "";
-        if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
-            try {
-                submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-            } catch (e) {
-                console.warn("Could not format date for doc:", doc.id, e);
-            }
-        }
-
+        const d = doc.data();
         rows.push({
           "Mã bài": d.examCode || "",
-	  "QuizId": d.quizId || "",
+	  	  "QuizId": d.quizId || "",
           "SBD": d.studentId || d.id || "",
           "Họ và tên": d.fullname || "",
           "Lớp": d.className || d.class || "",
@@ -79,104 +38,50 @@
          "Chi tiết câu trả lời": formatAnswers(d.answers || {})
         });
       });
-      
       return rows;
     }
-	 function formatAnswers(answers) {
-  if (!answers || typeof answers !== "object") return "";
-  let details = [];
-  let i = 1;
-  Object.keys(answers).forEach((key) => {
-    const ans = answers[key];
-    const chosen = ans.selected ?? ans.banChon ?? ans.answer ?? "";
-    const correct = ans.correct ?? ans.dapAn ?? "";
-    details.push(`Câu ${i}: Bạn chọn = ${chosen}, Đúng = ${correct}`);
-    i++;
-  });
-  return details.join("\n"); // xuống dòng từng câu trong Excel
-}
-function autoFitColumns(ws, data) {
-        const colWidths = [];
-        const header = Object.keys(data[0] || {});
-        
-        header.forEach((h, i) => {
-            let maxLen = h.length;
-            data.forEach(row => {
-                const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
-                if (val.length > maxLen) {
-                    maxLen = val.length;
-                }
-            });
-            colWidths[i] = { wch: maxLen + 2 };
-        });
-        ws["!cols"] = colWidths;
+
+    // 🔹 Hàm format lại object answers cho dễ đọc
+    function formatAnswers(answers) {
+      if (!answers || typeof answers !== "object") return "";
+
+      let details = [];
+      let i = 1;
+
+      Object.keys(answers).forEach((key) => {
+        const ans = answers[key];
+
+        // Trường hợp dạng mảng [true,false,true,false]
+        if (Array.isArray(ans)) {
+          details.push(`Câu ${i}: [${ans.map(v => v ? "✓" : "✗").join(", ")}]`);
+        }
+        // Trường hợp là string (ví dụ "$x=3$")
+        else if (typeof ans === "string") {
+          details.push(`Câu ${i}: ${ans}`);
+        }
+        // Trường hợp khác (null, số, object lồng)
+        else if (ans == null) {
+          details.push(`Câu ${i}: (không trả lời)`);
+        }
+        else {
+          details.push(`Câu ${i}: ${JSON.stringify(ans)}`);
+        }
+
+        i++;
+      });
+
+      return details.join("\n"); // xuống dòng trong Excel
     }
 
     async function exportExcel() {
-      const btn = document.getElementById("exportBtn");
-      const quizId = document.getElementById("quizIdInput").value.trim();
-      
-      btn.disabled = true;
-      btn.textContent = "Đang lấy dữ liệu...";
-
-      try {
-        const rows = await fetchRows(quizId);
-        
-        if (rows.length === 0) {
-          alert("Không tìm thấy kết quả nào. Vui lòng kiểm tra lại 'Mã Đề' hoặc đảm bảo đã có học sinh nộp bài.");
-          return;
-        }
-
-        btn.textContent = "Đang tạo file...";
-
-        // Sắp xếp lại dữ liệu theo ngày nộp mới nhất
-        rows.sort((a, b) => new Date(b["Ngày nộp"]) - new Date(a["Ngày nộp"]));
-
-        const ws = XLSX.utils.json_to_sheet(rows);
-        autoFitColumns(ws, rows);
-        
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "KetQuaThi");
-        
-        const filename = quizId ? `KetQua_${quizId}.xlsx` : 'KetQua_TatCa.xlsx';
-        XLSX.writeFile(wb, filename);
-
-      } catch (err) {
-        console.error("Lỗi khi xuất Excel:", err);
-        alert("Đã xảy ra lỗi: " + err.message + ". Hãy kiểm tra lại Quy tắc bảo mật (Rules) trong Firestore của bạn.");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Xuất ra Excel";
-      }
+      const rows = await fetchRows();
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả");
+      XLSX.writeFile(workbook, "KetQua_toanthayha.xlsx");
     }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("exportBtn").addEventListener("click", exportExcel);
-    });
   </script>
-</head>
-<body>
-  <div class="card">
-    <h2>Xuất kết quả thi ra Excel!</h2>
-        
-    <div class="field">
-      <label for="quizIdInput">Lọc theo QuizId: toanthayha_lop</label>
-      <input type="text" id="quizIdInput" placeholder="Ví dụ: toanthayha_09"/>
-    </div>
-    
-    <button id="exportBtn" class="btn">TẢI FILE</button>
-
-    <div class="note">
-        <b>Quan trọng:</b> Nếu bạn gặp lỗi "permission-denied" (quyền bị từ chối), hãy vào dự án Firebase của bạn, chọn <b>Firestore Database</b> > <b>Rules</b> và đảm bảo quy tắc của bạn cho phép đọc dữ liệu, ví dụ:
-        <br>
-        <code>
-            match /databases/{database}/documents { <br>
-            &nbsp;&nbsp;match /{document=**} { <br>
-            &nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true; <br>
-            &nbsp;&nbsp;} <br>
-            }
-        </code>
-    </div>
-  </div>
 </body>
-</html>
+</html>      
+      
+    	 
