@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Xuất kết quả thi ra Excel — Tách câu rõ</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Xuất Excel — Có đáp án đúng</title>
 
   <!-- SheetJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-  <!-- Firebase v8 (compat, dễ dùng trên trang tĩnh) -->
+  <!-- Firebase v8 compat (dễ chạy trên trang tĩnh) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
@@ -17,48 +16,53 @@
     .wrap{max-width:980px;margin:0 auto;background:#fff;border-radius:12px;padding:22px;border:1px solid #e6e7ea;box-shadow:0 8px 30px rgba(2,6,23,.06)}
     h1{margin:0 0 12px;font-size:20px;color:#0f172a}
     .row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
-    input[type="text"]{flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px}
+    input[type="text"], textarea{flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px}
+    textarea{height:110px;resize:vertical}
     button{background:#0f172a;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     button[disabled]{opacity:.6;cursor:not-allowed}
     .muted{color:#6b7280;font-size:13px;margin-top:6px}
-    pre.debug{background:#0b1220;color:#e6eef8;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap}
-    .controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    pre.debug{background:#0b1220;color:#e6eef8;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap;display:none}
+    label.small{font-size:13px;color:#374151;margin-bottom:6px;display:block}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+    .file{display:block;margin-top:6px}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Xuất kết quả thi ra Excel — Chi tiết mỗi câu (Bạn chọn / Đáp án đúng)</h1>
+    <h1>Xuất kết quả thi ra Excel — Có cột "Bạn chọn" & "Đáp án đúng"</h1>
 
     <div class="row">
-      <label style="min-width:110px">Lọc theo QuizId:</label>
-      <input id="quizIdInput" placeholder="(bỏ trống = tất cả) ví dụ: toanthayha_12" />
+      <label style="min-width:110px">Lọc QuizId:</label>
+      <input id="quizIdInput" placeholder="(bỏ trống = tất cả) ví dụ: toanthayha_12"/>
     </div>
 
     <div class="controls">
-      <button id="connectBtn">Kết nối Firebase (khởi tạo)</button>
-      <button id="exportFirebaseBtn">Kết nối & Xuất (Firebase)</button>
-      <button id="exportSampleBtn">Xuất từ dữ liệu mẫu (test)</button>
+      <button id="connectBtn">Khởi tạo Firebase</button>
+      <button id="exportFirebaseBtn">Kết nối & Xuất (Firestore)</button>
+      <button id="exportSampleBtn">Xuất từ mẫu (test)</button>
       <button id="showDebugBtn">Hiện/Ẩn Debug</button>
     </div>
 
-    <div class="muted">
-      File đọc collection <code>quizResults</code>. Nếu Firestore trả về field <code>answers</code> là object dạng <code>{"q1": ..., "q2": ...}</code>,
-      hệ thống sẽ tự động tách ra cột <strong>Câu N - Bạn chọn</strong> và (nếu có) <strong>Câu N - Đáp án đúng</strong>.
-      Nếu chưa kết nối được, dùng nút "Xuất từ dữ liệu mẫu" để kiểm tra.
+    <div style="margin-top:8px">
+      <label class="small">Answer key (JSON) — nếu bạn có file/JSON đáp án đúng, dán vào đây hoặc chọn file .json</label>
+      <textarea id="answerKeyInput" placeholder='Ví dụ: {"q1":"2","q2":"3","q3":"A"}'></textarea>
+      <input type="file" id="answerKeyFile" class="file" accept=".json"/>
+      <div style="margin-top:8px">
+        <button id="loadKeyBtn">Tải JSON từ ô lên</button>
+        <button id="fetchKeyBtn">Lấy key từ Firestore (collection "quizKeys", doc id = quizId)</button>
+      </div>
+      <div id="keyStatus" class="muted" style="margin-top:8px">Chưa nạp answer key.</div>
     </div>
 
     <div style="margin-top:12px">
-      <label style="min-width:110px; display:block; margin-bottom:6px">Trạng thái / Debug</label>
+      <label class="small">Trạng thái / Debug</label>
       <div id="status" class="muted">Sẵn sàng.</div>
-      <pre id="debug" class="debug" style="display:none;height:160px"></pre>
+      <pre id="debug" class="debug"></pre>
     </div>
   </div>
 
 <script>
-/* ===================== CHỖ ĐỂ DÁN FIREBASE CONFIG (nếu muốn) =====================
-Thay các giá trị bên dưới bằng config dự án Firebase của bạn.
-Nếu không muốn dùng Firebase, vẫn có thể dùng "Xuất từ dữ liệu mẫu".
-================================================================================= */
+/* ========== Dán config Firebase của bạn vào đây ========== */
 const firebaseConfig = {
   apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
   authDomain: "toanthayha-cd96c.firebaseapp.com",
@@ -68,111 +72,98 @@ const firebaseConfig = {
   appId: "1:940207284081:web:9801158f72cc14053ae0d0",
   measurementId: "G-9D5ZQ66BSB"
 };
-/* ================================================================================= */
+/* ========================================================= */
 
 const statusEl = document.getElementById('status');
 const debugEl = document.getElementById('debug');
+const keyStatusEl = document.getElementById('keyStatus');
 const showDebugBtn = document.getElementById('showDebugBtn');
 
-function setStatus(msg, isError=false) {
+function setStatus(msg, isError=false){
   statusEl.textContent = msg;
   statusEl.style.color = isError ? '#b91c1c' : '#374151';
 }
-function logDebug(obj) {
+function logDebug(obj){
   debugEl.style.display = 'block';
   debugEl.textContent = (typeof obj === 'string') ? obj : JSON.stringify(obj, null, 2);
 }
-
-showDebugBtn.addEventListener('click', () => {
+showDebugBtn.addEventListener('click', ()=> {
   debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
 });
 
-function stripLatex(str) {
-  if (str == null) return "";
-  if (typeof str !== 'string') return String(str);
-  return str.replace(/\$/g,'').replace(/\\left/g,'').replace(/\\right/g,'')
-            .replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\infty/g,'inf')
-            .replace(/\\\\/g,'\\').trim();
+/* Helpers */
+function stripLatex(s){
+  if (s == null) return "";
+  if (typeof s !== 'string') return String(s);
+  return s.replace(/\$/g,'').replace(/\\left/g,'').replace(/\\right/g,'')
+          .replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\infty/g,'inf')
+          .replace(/\\\\/g,'\\').trim();
 }
-function extractQuestionNumber(key) {
+function extractQuestionNumber(key){
   const m = String(key).match(/\d+/);
   return m ? parseInt(m[0],10) : key;
 }
-function answerValueToString(val) {
+function answerValueToString(val){
   if (val === null || val === undefined) return "";
-  if (Array.isArray(val)) return val.map(v => (v === true ? "true" : v===false ? "false" : stripLatex(v))).join(", ");
-  if (typeof val === 'object') {
-    // prefer common props
-    const prefer = ['selected','choice','answer','value','banChon','userAnswer','a','ans'];
+  if (Array.isArray(val)) return val.map(v => (v===true ? "true" : v===false ? "false" : stripLatex(v))).join(", ");
+  if (typeof val === 'object'){
+    const prefer = ['selected','choice','answer','value','banChon','userAnswer','a','b','ans'];
     for (const k of prefer) if (k in val && val[k] != null) return answerValueToString(val[k]);
-    // fallback: stringify
     try { return JSON.stringify(val); } catch(e) { return String(val); }
   }
   return stripLatex(val);
 }
 
-/* Tạo map các cột cho từng câu: "Câu N - Bạn chọn" và "Câu N - Đáp án đúng" */
-function formatAnswersObjectToColumns(answersObj, allQuestionKeys) {
+/* format per-question columns from answers object */
+function formatAnswersObjectToColumns(answersObj, allQuestionKeys){
   const out = {};
   if (!answersObj || typeof answersObj !== 'object') return out;
-
   allQuestionKeys.forEach(k => {
     const qNum = extractQuestionNumber(k);
-    const colSel = `Câu ${qNum} - Bạn chọn`;
-    const colCor = `Câu ${qNum} - Đáp án đúng`;
+    const selCol = `Câu ${qNum} - Bạn chọn`;
+    const corCol = `Câu ${qNum} - Đáp án đúng`;
     const entry = answersObj[k];
     let sel = "", cor = "";
-
     if (entry === null || entry === undefined) { sel=""; cor=""; }
-    else if (Array.isArray(entry)) {
-      sel = answerValueToString(entry);
-      cor = "";
-    } else if (typeof entry === 'object') {
-      // tìm trong object
+    else if (Array.isArray(entry)) { sel = answerValueToString(entry); cor=""; }
+    else if (typeof entry === 'object'){
       const chooseKeys = ['selected','chosen','choice','answer','value','banChon','userAnswer','a'];
       const correctKeys = ['correct','dapAn','correctAnswer','trueAnswer','b','key'];
       for (const kk of chooseKeys) if (kk in entry && entry[kk] != null) { sel = answerValueToString(entry[kk]); break; }
       for (const kk of correctKeys) if (kk in entry && entry[kk] != null) { cor = answerValueToString(entry[kk]); break; }
       if (!sel) {
-        // fallback: chọn thuộc tính đầu tiên có giá trị nguyên
         for (const kk in entry) {
           if (Object.prototype.hasOwnProperty.call(entry, kk)) {
             const v = entry[kk];
             if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || Array.isArray(v)) {
-              sel = answerValueToString(v);
-              break;
+              sel = answerValueToString(v); break;
             }
           }
         }
       }
-    } else {
-      sel = answerValueToString(entry);
-      cor = "";
-    }
-
-    out[colSel] = sel;
-    out[colCor] = cor;
+    } else { sel = answerValueToString(entry); cor=""; }
+    out[selCol] = sel;
+    out[corCol] = cor;
   });
-
   return out;
 }
 
-/* ================== Hàm xuất file Excel ================== */
-function autoFitColumns(ws, data) {
-  if (!data || data.length === 0) return;
-  const header = Object.keys(data[0] || {});
-  const colWidths = header.map(h => ({ wch: Math.min(80, h.length + 4) }));
+/* Auto-fit columns & export */
+function autoFitColumns(ws, data){
+  if (!data || data.length===0) return;
+  const headers = Object.keys(data[0]);
+  const colWidths = headers.map(h => ({wch: Math.min(120,h.length+4)}));
   data.forEach(row => {
-    header.forEach((h, i) => {
-      const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
-      const lines = val.split(/\r?\n/);
-      const maxlen = Math.max(...lines.map(L => L.length));
-      if (maxlen + 2 > (colWidths[i].wch || 0)) colWidths[i].wch = Math.min(120, maxlen + 2);
+    headers.forEach((h,i) => {
+      const v = row[h] === null || row[h] === undefined ? '' : String(row[h]);
+      const lines = v.split(/\r?\n/);
+      const maxlen = Math.max(...lines.map(L=>L.length));
+      if (maxlen+2 > (colWidths[i].wch||0)) colWidths[i].wch = Math.min(200, maxlen+2);
     });
   });
   ws['!cols'] = colWidths;
 }
-function exportToExcel(rows, filename = 'KetQua.xlsx') {
+function exportToExcel(rows, filename='KetQua.xlsx'){
   const ws = XLSX.utils.json_to_sheet(rows);
   autoFitColumns(ws, rows);
   const wb = XLSX.utils.book_new();
@@ -180,100 +171,82 @@ function exportToExcel(rows, filename = 'KetQua.xlsx') {
   XLSX.writeFile(wb, filename);
 }
 
-/* ================ Dữ liệu mẫu (dùng để test nhanh) ================= */
-const sampleDocs = [
-  { fullname: "Nguyễn Văn A", className: "12A1", school: "THPT X", studentId: "540101", score: 8.5, timeTaken: 3600,
-    submittedAt: { seconds: Math.floor(Date.now()/1000) },
-    quizId: "toanthayha_12",
-    examCode: "Toan12_002",
-    answers: {
-      q1: "3",
-      q2: "2",
-      q3: { selected: "2", correct: "2" },
-      q4: [true,false,true,false],
-      q5: { selected: "18 (m/s)" },
-      q6: null,
-      q7: { selected: "m=1", correct: "m=1" }
-    }
-  },
-  { fullname: "Trần Thị B", className: "12A2", school: "THPT Y", studentId: "540102", score: 6.0, timeTaken: 4200,
-    submittedAt: { seconds: Math.floor(Date.now()/1000)-3600 },
-    quizId: "toanthayha_12",
-    examCode: "Toan12_002",
-    answers: {
-      q1: "2",
-      q2: "2",
-      q3: { selected: "1", correct: "2" },
-      q4: [false,false,false,false],
-      q5: { selected: "20 (m/s)" }
-    }
-  }
-];
-
-/* ================ Firestore (v8) interaction ================== */
-let firebaseInitialized = false;
-function initFirebase() {
-  if (!firebaseInitialized) {
-    try {
-      if (!firebase.apps || firebase.apps.length === 0) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      firebaseInitialized = true;
-      setStatus('Firebase đã khởi tạo.');
-    } catch (e) {
-      setStatus('Không thể khởi tạo Firebase: ' + (e.message || e), true);
-      logDebug(e);
-      throw e;
-    }
+/* Firebase init (v8) */
+let firebaseInited = false;
+function initFirebase(){
+  if (firebaseInited) return;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    firebaseInited = true;
+    setStatus('Firebase khởi tạo thành công.');
+  } catch(e){
+    setStatus('Lỗi khởi tạo Firebase: ' + (e.message||e), true);
+    logDebug(e);
+    throw e;
   }
 }
 
-async function fetchFromFirestore(quizId) {
-  initFirebase();
-  setStatus('Đang truy vấn Firestore...');
-  const db = firebase.firestore();
-  let qRef = db.collection('quizResults');
-  if (quizId) qRef = qRef.where('quizId', '==', quizId);
-  const snapshot = await qRef.get();
-  if (snapshot.empty) {
-    setStatus('Không tìm thấy dữ liệu trong Firestore (theo filter).', true);
-    return { docs: [], allQuestionKeys: [] };
+/* fetch quiz key doc from collection "quizKeys", doc id = quizId */
+async function fetchKeyFromFirestore(quizId){
+  try {
+    initFirebase();
+    const db = firebase.firestore();
+    const docRef = db.collection('quizKeys').doc(quizId);
+    const doc = await docRef.get();
+    if (!doc.exists) { setStatus(`Không thấy quiz key doc id=${quizId}`); return {}; }
+    const data = doc.data();
+    setStatus(`Lấy answer key từ quizKeys/${quizId}`);
+    return data.answers || data || {};
+  } catch(e){
+    setStatus('Lỗi khi lấy key từ Firestore: ' + (e.message||e), true);
+    logDebug(e);
+    return {};
   }
-
-  const docs = [];
-  const keySet = new Set();
-  snapshot.forEach(doc => {
-    const d = doc.data();
-    docs.push(d);
-    if (d.answers && typeof d.answers === 'object') Object.keys(d.answers).forEach(k => keySet.add(k));
-    if (d.correctAnswers && typeof d.correctAnswers === 'object') Object.keys(d.correctAnswers).forEach(k => keySet.add(k));
-  });
-
-  const allQuestionKeys = Array.from(keySet).sort((a,b) => {
-    const na = extractQuestionNumber(a), nb = extractQuestionNumber(b);
-    if (isNaN(na) && isNaN(nb)) return String(a).localeCompare(String(b));
-    if (isNaN(na)) return 1; if (isNaN(nb)) return -1; return na - nb;
-  });
-
-  setStatus(`Lấy ${docs.length} bản ghi từ Firestore. Phát hiện ${allQuestionKeys.length} câu hỏi.`);
-  return { docs, allQuestionKeys };
 }
 
-/* ================ Chuyển docs thành rows cho Excel ================== */
-function prepareRowsFromDocs(docs, allQuestionKeys) {
+/* Fetch quizResults from Firestore (collection quizResults) */
+async function fetchFromFirestore(quizId){
+  try {
+    initFirebase();
+    setStatus('Truy vấn Firestore...');
+    const db = firebase.firestore();
+    let qRef = db.collection('quizResults');
+    if (quizId) qRef = qRef.where('quizId','==',quizId);
+    const snapshot = await qRef.get();
+    if (snapshot.empty) { setStatus('Không có bản ghi (Firestore).', true); return {docs:[], allQuestionKeys:[]}; }
+    const docs = [];
+    const keySet = new Set();
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      docs.push(d);
+      if (d.answers && typeof d.answers === 'object') Object.keys(d.answers).forEach(k => keySet.add(k));
+      if (d.correctAnswers && typeof d.correctAnswers === 'object') Object.keys(d.correctAnswers).forEach(k => keySet.add(k));
+    });
+    const allQuestionKeys = Array.from(keySet).sort((a,b)=> {
+      const na = extractQuestionNumber(a), nb = extractQuestionNumber(b);
+      if (isNaN(na) && isNaN(nb)) return String(a).localeCompare(String(b));
+      if (isNaN(na)) return 1; if (isNaN(nb)) return -1; return na-nb;
+    });
+    setStatus(`Lấy ${docs.length} bản ghi; phát hiện ${allQuestionKeys.length} câu.`);
+    return {docs, allQuestionKeys};
+  } catch(e){
+    setStatus('Lỗi khi truy vấn Firestore: ' + (e.message||e), true);
+    logDebug(e);
+    return {docs:[], allQuestionKeys:[]};
+  }
+}
+
+/* Prepare rows */
+function prepareRowsFromDocs(docs, allQuestionKeys, quizKeyMap={}, userKeyMap={}){
   const rows = [];
   docs.forEach(d => {
-    // format date
+    // submit time
     let submittedAt = "";
     try {
-      if (d.submittedAt && typeof d.submittedAt.toDate === 'function') {
-        submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-      } else if (d.submittedAt && d.submittedAt.seconds) {
-        submittedAt = new Date(d.submittedAt.seconds * 1000).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-      } else if (d.submittedAt) submittedAt = String(d.submittedAt);
-    } catch(e) {
-      submittedAt = "";
-    }
+      if (d.submittedAt && typeof d.submittedAt.toDate === 'function') submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN');
+      else if (d.submittedAt && d.submittedAt.seconds) submittedAt = new Date(d.submittedAt.seconds*1000).toLocaleString('vi-VN');
+      else if (d.submittedAt) submittedAt = String(d.submittedAt);
+    } catch(e){ submittedAt = ""; }
 
     const base = {
       "Mã bài": d.examCode || "",
@@ -282,21 +255,48 @@ function prepareRowsFromDocs(docs, allQuestionKeys) {
       "Họ và tên": d.fullname || "",
       "Lớp": d.className || d.class || "",
       "Trường": d.school || "",
-      "Điểm": typeof d.score === 'number' ? d.score : (d.score ?? ""),
+      "Điểm": (typeof d.score === 'number' ? d.score : (d.score ?? "")),
       "Thời gian làm (giây)": typeof d.timeTaken === 'number' ? d.timeTaken : (d.timeTaken ?? ""),
       "Ngày nộp": submittedAt
     };
 
+    // per-question columns from student's answers
     const perQ = formatAnswersObjectToColumns(d.answers || {}, allQuestionKeys);
 
-    // Build human readable detail text
+    // build detail lines, and fill correct answers from multiple sources
     const detailLines = [];
     allQuestionKeys.forEach(k => {
       const qNum = extractQuestionNumber(k);
-      const sel = perQ[`Câu ${qNum} - Bạn chọn`] || "";
-      let cor = perQ[`Câu ${qNum} - Đáp án đúng`] || "";
-      if (!cor && d.correctAnswers && d.correctAnswers[k] !== undefined) cor = answerValueToString(d.correctAnswers[k]);
-      if (!cor && d.answerKey && d.answerKey[k] !== undefined) cor = answerValueToString(d.answerKey[k]);
+      const selCol = `Câu ${qNum} - Bạn chọn`;
+      const corCol = `Câu ${qNum} - Đáp án đúng`;
+      let sel = perQ[selCol] || "";
+      let cor = perQ[corCol] || "";
+
+      // try d.correctAnswers, d.answerKey, d.keys
+      if (!cor) {
+        if (d.correctAnswers && d.correctAnswers[k] !== undefined) cor = answerValueToString(d.correctAnswers[k]);
+        else if (d.answerKey && d.answerKey[k] !== undefined) cor = answerValueToString(d.answerKey[k]);
+        else if (d.keys && d.keys[k] !== undefined) cor = answerValueToString(d.keys[k]);
+      }
+
+      // try quizKeyMap and user supplied map
+      if (!cor && quizKeyMap && (quizKeyMap[k] !== undefined || quizKeyMap[String(extractQuestionNumber(k))] !== undefined)) {
+        cor = answerValueToString(quizKeyMap[k] ?? quizKeyMap[String(extractQuestionNumber(k))]);
+      }
+      if (!cor && userKeyMap && (userKeyMap[k] !== undefined || userKeyMap[String(extractQuestionNumber(k))] !== undefined)) {
+        cor = answerValueToString(userKeyMap[k] ?? userKeyMap[String(extractQuestionNumber(k))]);
+      }
+
+      // If still empty but d.answers may contain inner object with correct key we didn't catch, try scanning
+      if (!cor && d.answers && d.answers[k] && typeof d.answers[k] === 'object') {
+        const entry = d.answers[k];
+        const prefer = ['correct','dapAn','correctAnswer','trueAnswer','b','key'];
+        for (const kk of prefer) if (kk in entry && entry[kk] != null) { cor = answerValueToString(entry[kk]); break; }
+      }
+
+      // set into perQ (so exported sheet includes the cor col)
+      perQ[corCol] = cor || "";
+
       const left = sel ? `Bạn chọn = ${sel}` : "(Không trả lời)";
       const right = cor ? ` | Đúng = ${cor}` : "";
       detailLines.push(`Câu ${qNum}: ${left}${right}`);
@@ -305,59 +305,119 @@ function prepareRowsFromDocs(docs, allQuestionKeys) {
     const detailText = detailLines.join("\n");
     rows.push(Object.assign({}, base, perQ, { "Chi tiết (văn bản)": detailText }));
   });
-
   return rows;
 }
 
-/* ================ Buttons handlers ================== */
+/* ========== Buttons / interactions ========== */
 document.getElementById('connectBtn').addEventListener('click', () => {
+  try { initFirebase(); } catch(e) { setStatus('Lỗi init', true); }
+});
+
+document.getElementById('answerKeyFile').addEventListener('change', (ev) => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      document.getElementById('answerKeyInput').value = reader.result;
+      setStatus('Đã nạp file JSON vào ô Answer key.');
+      keyStatusEl.textContent = 'Đã nạp từ file.';
+    } catch(e) { setStatus('Không đọc được file JSON', true); logDebug(e); }
+  };
+  reader.readAsText(f);
+});
+
+document.getElementById('loadKeyBtn').addEventListener('click', ()=> {
+  const txt = document.getElementById('answerKeyInput').value.trim();
+  if (!txt) { keyStatusEl.textContent = 'Chưa có JSON trong ô.'; return; }
   try {
-    initFirebase();
-    setStatus('Firebase khởi tạo (sẵn sàng).');
+    const parsed = JSON.parse(txt);
+    keyStatusEl.textContent = 'Đã phân tích JSON (đã nạp key).';
+    logDebug(parsed);
   } catch(e) {
-    setStatus('Lỗi khi khởi tạo Firebase.', true);
-    logDebug(e);
+    keyStatusEl.textContent = 'JSON không hợp lệ.'; logDebug(e);
   }
 });
 
-document.getElementById('exportSampleBtn').addEventListener('click', () => {
+document.getElementById('fetchKeyBtn').addEventListener('click', async ()=> {
+  const quizId = document.getElementById('quizIdInput').value.trim();
+  if (!quizId) { setStatus('Nhập QuizId trước khi lấy key từ Firestore.', true); return; }
+  try {
+    const keyMap = await fetchKeyFromFirestore(quizId);
+    document.getElementById('answerKeyInput').value = JSON.stringify(keyMap, null, 2);
+    keyStatusEl.textContent = `Đã tải key từ quizKeys/${quizId}`;
+    logDebug(keyMap);
+  } catch(e) { setStatus('Lỗi khi lấy key', true); logDebug(e); }
+});
+
+/* sample data for quick test */
+const sampleDocs = [
+  { fullname:"Nguyen A", className:"12A1", school:"THPT X", studentId:"540101", score:8,
+    submittedAt: { seconds: Math.floor(Date.now()/1000) },
+    quizId:"toanthayha_12",
+    examCode:"Toan12_002",
+    answers: { q1: "3", q2: "2", q3: {selected:"2", correct:"2"}, q4:[true,false,true,false], q5:{selected:"18 (m/s)"}} ,
+    correctAnswers: { q1:"3", q2:"2", q3:"2", q4: [false,false,false,false], q5:"18 (m/s)"}
+  },
+  { fullname:"Tran B", className:"12A2", school:"THPT Y", studentId:"540102", score:6,
+    submittedAt: { seconds: Math.floor(Date.now()/1000)-3600 },
+    quizId:"toanthayha_12",
+    examCode:"Toan12_002",
+    answers: { q1: "2", q2: "2", q3:{selected:"1", correct:"2"}, q4:[false,false,false,false] }
+  }
+];
+
+document.getElementById('exportSampleBtn').addEventListener('click', ()=> {
   setStatus('Tạo file từ dữ liệu mẫu...');
   try {
-    // giả lập docs + keys
-    const docs = sampleDocs;
+    // gather keys from samples
     const keySet = new Set();
-    docs.forEach(d => { if (d.answers) Object.keys(d.answers).forEach(k=>keySet.add(k)); });
-    const keys = Array.from(keySet).sort((a,b)=> {
-      const na = extractQuestionNumber(a), nb = extractQuestionNumber(b);
+    sampleDocs.forEach(d => { if (d.answers) Object.keys(d.answers).forEach(k=>keySet.add(k)); if (d.correctAnswers) Object.keys(d.correctAnswers).forEach(k=>keySet.add(k)); });
+    const allKeys = Array.from(keySet).sort((a,b)=> {
+      const na=extractQuestionNumber(a), nb=extractQuestionNumber(b);
       if (isNaN(na) && isNaN(nb)) return String(a).localeCompare(String(b));
       if (isNaN(na)) return 1; if (isNaN(nb)) return -1; return na-nb;
     });
-    const rows = prepareRowsFromDocs(docs, keys);
+    // user provided key map
+    let userKeyMap = {};
+    try { userKeyMap = JSON.parse(document.getElementById('answerKeyInput').value || "{}"); } catch(e){ userKeyMap = {}; }
+    const rows = prepareRowsFromDocs(sampleDocs, allKeys, {}, userKeyMap);
     exportToExcel(rows, 'KetQua_sample.xlsx');
     setStatus('Đã tạo file KetQua_sample.xlsx');
-    logDebug(rows.slice(0,3));
-  } catch(e) {
-    setStatus('Lỗi khi tạo file mẫu: ' + (e.message||e), true);
-    logDebug(e);
+    logDebug(rows.slice(0,2));
+  } catch(e){
+    setStatus('Lỗi tạo file mẫu: '+(e.message||e), true); logDebug(e);
   }
 });
 
-document.getElementById('exportFirebaseBtn').addEventListener('click', async () => {
+document.getElementById('exportFirebaseBtn').addEventListener('click', async ()=> {
   try {
-    setStatus('Bắt đầu: kết nối tới Firestore...');
+    setStatus('Bắt đầu lấy dữ liệu từ Firestore...');
     initFirebase();
     const quizId = document.getElementById('quizIdInput').value.trim();
+    // optionally fetch quizKeyMap if quiz keys stored in quizKeys collection
+    let quizKeyMap = {};
+    try { if (quizId) quizKeyMap = await fetchKeyFromFirestore(quizId); } catch(e){ quizKeyMap={}; }
+    // fetch docs
     const res = await fetchFromFirestore(quizId);
-    if (!res || !res.docs || res.docs.length === 0) {
-      setStatus('Không có bản ghi để xuất (Firestore trả về rỗng).', true);
-      return;
-    }
-    const rows = prepareRowsFromDocs(res.docs, res.allQuestionKeys);
+    if (!res || !res.docs || res.docs.length===0) { setStatus('Không có bản ghi trả về.', true); return; }
+    // also include keys from quizKeyMap and userKeyMap in union of keys
+    let keySet = new Set(res.allQuestionKeys || []);
+    Object.keys(quizKeyMap || {}).forEach(k=>keySet.add(k));
+    let userKeyMap = {};
+    try { userKeyMap = JSON.parse(document.getElementById('answerKeyInput').value || "{}"); } catch(e){ userKeyMap = {}; }
+    Object.keys(userKeyMap || {}).forEach(k=>keySet.add(k));
+    const allKeys = Array.from(keySet).sort((a,b)=> {
+      const na=extractQuestionNumber(a), nb=extractQuestionNumber(b);
+      if (isNaN(na) && isNaN(nb)) return String(a).localeCompare(String(b));
+      if (isNaN(na)) return 1; if (isNaN(nb)) return -1; return na-nb;
+    });
+    const rows = prepareRowsFromDocs(res.docs, allKeys, quizKeyMap, userKeyMap);
     exportToExcel(rows, quizId ? `KetQua_${quizId}.xlsx` : 'KetQua_Firestore.xlsx');
-    setStatus('Hoàn tất: đã tải file Excel từ Firestore.');
+    setStatus('Hoàn tất: đã tải file từ Firestore.');
     logDebug(rows.length ? rows[0] : rows);
-  } catch(e) {
-    setStatus('Lỗi khi xuất từ Firebase: ' + (e.message || e), true);
+  } catch(e){
+    setStatus('Lỗi khi xuất từ Firebase: ' + (e.message||e), true);
     logDebug(e && e.stack ? e.stack : e);
   }
 });
