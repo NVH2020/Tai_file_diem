@@ -76,14 +76,26 @@
           "Điểm": typeof d.score === "number" ? d.score : "",
           "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
           "Ngày nộp": submittedAt,
-          "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
+         "Chi tiết câu trả lời": formatAnswers(d.answers || {})
         });
       });
       
       return rows;
     }
-
-    function autoFitColumns(ws, data) {
+	 function formatAnswers(answers) {
+  if (!answers || typeof answers !== "object") return "";
+  let details = [];
+  let i = 1;
+  Object.keys(answers).forEach((key) => {
+    const ans = answers[key];
+    const chosen = ans.selected ?? ans.banChon ?? ans.answer ?? "";
+    const correct = ans.correct ?? ans.dapAn ?? "";
+    details.push(`Câu ${i}: Bạn chọn = ${chosen}, Đúng = ${correct}`);
+    i++;
+  });
+  return details.join("\n"); // xuống dòng từng câu trong Excel
+}
+function autoFitColumns(ws, data) {
         const colWidths = [];
         const header = Object.keys(data[0] || {});
         
