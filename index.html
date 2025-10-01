@@ -1,116 +1,170 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Xuất kết quả thi</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-</head>
-<body>
-  <h2>Xuất kết quả thi ra Excel (có đáp án đúng)</h2>
-  <input type="text" id="quizIdInput" placeholder="Nhập QuizId, ví dụ: toan11_de01"/>
-  <button id="exportBtn">Tải file Excel</button>
+  <title>Xuất kết quả thi ra Excel</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; margin: 0; }
+    .card { max-width: 600px; width: 100%; background-color: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -2px rgba(0,0,0,.05); }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-top: 0; }
+    .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    label { font-weight: 500; }
+    input[type="text"] { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
+    input[type="text"]:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+    .btn { padding: 10px 16px; border-radius: 8px; border: none; background-color: #1f2937; color: white; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+    .btn:hover { background-color: #374151; }
+    .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+    .muted { color: #6b7280; font-size: 0.875rem; margin-top: 8px;}
+    .note { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; padding: 16px; font-size: 0.875rem; margin-top: 24px; }
+  </style>
 
+  <!-- Thư viện SheetJS để tạo file Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- Thư viện Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // 🔧 Firebase config của bạn
+    // ==================================================================
+    // === 🔧 BƯỚC 1: DÁN CẤU HÌNH FIREBASE CỦA BẠN VÀO ĐÂY ===
+    // ==================================================================
+    // (Tôi đã điền sẵn cấu hình từ file cũ của bạn, hãy đảm bảo nó đúng)
     const firebaseConfig = {
-      apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
-      authDomain: "toanthayha-cd96c.firebaseapp.com",
-      projectId: "toanthayha-cd96c",
-      storageBucket: "toanthayha-cd96c.firebasestorage.app",
-      messagingSenderId: "940207284081",
-      appId: "1:940207284081:web:9801158f72cc14053ae0d0",
-      measurementId: "G-9D5ZQ66BSB"
-    };
+  	apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
+  	authDomain: "toanthayha-cd96c.firebaseapp.com",
+  	projectId: "toanthayha-cd96c",
+  	storageBucket: "toanthayha-cd96c.firebasestorage.app",
+  	messagingSenderId: "940207284081",
+  	appId: "1:940207284081:web:9801158f72cc14053ae0d0",
+  	measurementId: "G-9D5ZQ66BSB"
+	};
+    // ==================================================================
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // 📌 Lấy đáp án chuẩn theo quizId
-    async function getAnswerKey(quizId) {
-      const q = query(collection(db, "quizAnswerKeys"), where("quizId", "==", quizId));
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return {};
-      return snapshot.docs[0].data().answers || {};  // { Q101: "A", Q102: "B", ... }
-    }
+    async function fetchRows(quizId) {
+      const colRef = collection(db, "quizResults");
+      const q = quizId 
+          ? query(colRef, where("quizId", "==", quizId))
+          : query(colRef); // Lấy tất cả nếu không có quizId
 
-    // 📌 Lấy kết quả học sinh
-    async function getResults(quizId) {
-      const q = query(collection(db, "quizResults"), where("quizId", "==", quizId));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => doc.data());
+      const rows = [];
+      snapshot.forEach(doc => {
+        const d = doc.data() || {};
+        
+        // Xử lý ngày tháng an toàn hơn
+        let submittedAt = "";
+        if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
+            try {
+                submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+            } catch (e) {
+                console.warn("Could not format date for doc:", doc.id, e);
+            }
+        }
+
+        rows.push({
+          "Mã bài": d.examCode || "",
+	  "QuizId": d.quizId || "",
+          "SBD": d.studentId || d.id || "",
+          "Họ và tên": d.fullname || "",
+          "Lớp": d.className || d.class || "",
+          "Trường": d.school || "",
+          "Điểm": typeof d.score === "number" ? d.score : "",
+          "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
+          "Ngày nộp": submittedAt,
+          "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
+        });
+      });
+      
+      return rows;
     }
 
     function autoFitColumns(ws, data) {
-      const colWidths = [];
-      const header = Object.keys(data[0] || {});
-      header.forEach((h, i) => {
-        let maxLen = h.length;
-        data.forEach(row => {
-          const val = row[h] ? String(row[h]) : "";
-          if (val.length > maxLen) maxLen = val.length;
+        const colWidths = [];
+        const header = Object.keys(data[0] || {});
+        
+        header.forEach((h, i) => {
+            let maxLen = h.length;
+            data.forEach(row => {
+                const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
+                if (val.length > maxLen) {
+                    maxLen = val.length;
+                }
+            });
+            colWidths[i] = { wch: maxLen + 2 };
         });
-        colWidths[i] = { wch: maxLen + 2 };
-      });
-      ws["!cols"] = colWidths;
+        ws["!cols"] = colWidths;
     }
 
     async function exportExcel() {
+      const btn = document.getElementById("exportBtn");
       const quizId = document.getElementById("quizIdInput").value.trim();
-      if (!quizId) {
-        alert("Vui lòng nhập QuizId");
-        return;
+      
+      btn.disabled = true;
+      btn.textContent = "Đang lấy dữ liệu...";
+
+      try {
+        const rows = await fetchRows(quizId);
+        
+        if (rows.length === 0) {
+          alert("Không tìm thấy kết quả nào. Vui lòng kiểm tra lại 'Mã Đề' hoặc đảm bảo đã có học sinh nộp bài.");
+          return;
+        }
+
+        btn.textContent = "Đang tạo file...";
+
+        // Sắp xếp lại dữ liệu theo ngày nộp mới nhất
+        rows.sort((a, b) => new Date(b["Ngày nộp"]) - new Date(a["Ngày nộp"]));
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        autoFitColumns(ws, rows);
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "KetQuaThi");
+        
+        const filename = quizId ? `KetQua_${quizId}.xlsx` : 'KetQua_TatCa.xlsx';
+        XLSX.writeFile(wb, filename);
+
+      } catch (err) {
+        console.error("Lỗi khi xuất Excel:", err);
+        alert("Đã xảy ra lỗi: " + err.message + ". Hãy kiểm tra lại Quy tắc bảo mật (Rules) trong Firestore của bạn.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Xuất ra Excel";
       }
-
-      const [answerKey, results] = await Promise.all([
-        getAnswerKey(quizId),
-        getResults(quizId)
-      ]);
-
-      if (results.length === 0) {
-        alert("Không có kết quả nào cho QuizId này!");
-        return;
-      }
-
-      const rows = [];
-
-      results.forEach(r => {
-        // Thông tin chung
-        rows.push({
-          "SBD": r.studentId || "",
-          "Họ và tên": r.fullname || "",
-          "Lớp": r.className || "",
-          "Điểm": r.score ?? "",
-          "Ngày nộp": r.submittedAt?.toDate?.().toLocaleString("vi-VN") || ""
-        });
-
-        // Chi tiết từng câu
-        const answers = r.answers || {};
-        Object.keys(answers).forEach(qid => {
-          rows.push({
-            "SBD": r.studentId || "",
-            "Câu hỏi ID": qid,
-            "Bạn chọn": answers[qid],
-            "Đáp án đúng": answerKey[qid] || "N/A"
-          });
-        });
-
-        // Dòng trống phân cách
-        rows.push({});
-      });
-
-      const ws = XLSX.utils.json_to_sheet(rows);
-      autoFitColumns(ws, rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "KetQua");
-
-      XLSX.writeFile(wb, `KetQua_${quizId}.xlsx`);
     }
 
-    document.getElementById("exportBtn").addEventListener("click", exportExcel);
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("exportBtn").addEventListener("click", exportExcel);
+    });
   </script>
+</head>
+<body>
+  <div class="card">
+    <h2>Xuất kết quả thi ra Excel!</h2>
+        
+    <div class="field">
+      <label for="quizIdInput">Lọc theo QuizId: toanthayha_lop</label>
+      <input type="text" id="quizIdInput" placeholder="Ví dụ: toanthayha_09"/>
+    </div>
+    
+    <button id="exportBtn" class="btn">TẢI FILE</button>
+
+    <div class="note">
+        <b>Quan trọng:</b> Nếu bạn gặp lỗi "permission-denied" (quyền bị từ chối), hãy vào dự án Firebase của bạn, chọn <b>Firestore Database</b> > <b>Rules</b> và đảm bảo quy tắc của bạn cho phép đọc dữ liệu, ví dụ:
+        <br>
+        <code>
+            match /databases/{database}/documents { <br>
+            &nbsp;&nbsp;match /{document=**} { <br>
+            &nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true; <br>
+            &nbsp;&nbsp;} <br>
+            }
+        </code>
+    </div>
+  </div>
 </body>
 </html>
