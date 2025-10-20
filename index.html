@@ -71,7 +71,7 @@
           "Điểm": typeof d.score === "number" ? d.score : "",
           "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
           "Ngày nộp": submittedAt,
-          "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
+          "Chi tiết câu trả lời": JSON.stringify(d.answers.q1 || {})
         });
       });
 
