@@ -14,7 +14,7 @@
     input[type="text"] { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
     input[type="text"]:focus { outline: 2px solid #3b82f6; border-color: transparent; }
     .btn { padding: 10px 16px; border-radius: 8px; border: none; background-color: #1f2937; color: white; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-    .btn:hover { background-color: #374151; }
+    .btn:hover { background-color: #374151; }	
     .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
     .muted { color: #6b7280; font-size: 0.875rem; margin-top: 8px;}
     .note { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; padding: 16px; font-size: 0.875rem; margin-top: 24px; }
@@ -46,12 +46,11 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    async function fetchRows(quizId) {
-      const colRef = collection(db, "quizResults");
-      const q = quizId 
-          ? query(colRef, where("quizId", "==", quizId))
-          : query(colRef); // Lấy tất cả nếu không có quizId
-
+    async function fetchRows(examCode) {
+      const colRef = collection(db, "examCodeResults");
+      const q = examCode
+          ? query(colRef, where("examCode", "==", examCode))
+          : query(colRef); // Lấy tất cả nếu không có examCode
       const snapshot = await getDocs(q);
       const rows = [];
       snapshot.forEach(doc => {
