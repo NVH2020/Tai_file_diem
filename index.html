@@ -103,13 +103,13 @@
 
     async function exportExcel() {
       const btn = document.getElementById("exportBtn");
-      const quizId = document.getElementById("quizIdInput").value.trim();
+      const examCode = document.getElementById("examCodeInput").value.trim();
       
       btn.disabled = true;
       btn.textContent = "Đang lấy dữ liệu...";
 
       try {
-        const rows = await fetchRows(quizId);
+        const rows = await fetchRows(examCode);
         
         if (rows.length === 0) {
           alert("Không tìm thấy kết quả nào. Vui lòng kiểm tra lại 'Mã Đề' hoặc đảm bảo đã có học sinh nộp bài.");
@@ -127,7 +127,7 @@
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "KetQuaThi");
         
-        const filename = quizId ? `KetQua_${quizId}.xlsx` : 'KetQua_TatCa.xlsx';
+        const filename = examCode ? `KetQua_${quizId}.xlsx` : 'KetQua_TatCa.xlsx';
         XLSX.writeFile(wb, filename);
 
       } catch (err) {
@@ -149,8 +149,8 @@
     <h2>Xuất kết quả thi ra Excel!</h2>
         
     <div class="field">
-      <label for="quizIdInput">Lọc theo QuizId: toanthayha_lop</label>
-      <input type="text" id="quizIdInput" placeholder="Ví dụ: toanthayha_09"/>
+      <label for="quizIdInput">Lọc theo Mã kỳ thi</label>
+      <input type="text" id="examCodeInput" placeholder="Ví dụ: Toan12_001"/>
     </div>
     
     <button id="exportBtn" class="btn">TẢI FILE</button>
