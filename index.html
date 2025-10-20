@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -14,122 +13,118 @@
     input[type="text"] { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
     input[type="text"]:focus { outline: 2px solid #3b82f6; border-color: transparent; }
     .btn { padding: 10px 16px; border-radius: 8px; border: none; background-color: #1f2937; color: white; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-    .btn:hover { background-color: #374151; }	
+    .btn:hover { background-color: #374151; }
     .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
-    .muted { color: #6b7280; font-size: 0.875rem; margin-top: 8px;}
     .note { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; padding: 16px; font-size: 0.875rem; margin-top: 24px; }
   </style>
 
-  <!-- Thư viện SheetJS để tạo file Excel -->
+  <!-- Thư viện SheetJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- Thư viện Firebase -->
+  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // ==================================================================
-    // === 🔧 BƯỚC 1: DÁN CẤU HÌNH FIREBASE CỦA BẠN VÀO ĐÂY ===
-    // ==================================================================
-    // (Tôi đã điền sẵn cấu hình từ file cũ của bạn, hãy đảm bảo nó đúng)
+    // === Cấu hình Firebase ===
     const firebaseConfig = {
-  	apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
-  	authDomain: "toanthayha-cd96c.firebaseapp.com",
-  	projectId: "toanthayha-cd96c",
-  	storageBucket: "toanthayha-cd96c.firebasestorage.app",
-  	messagingSenderId: "940207284081",
-  	appId: "1:940207284081:web:9801158f72cc14053ae0d0",
-  	measurementId: "G-9D5ZQ66BSB"
-	};
-    // ==================================================================
+      apiKey: "AIzaSyAwM9_H8PTooz3Nh4MPt9wdtBScIvMC318",
+      authDomain: "toanthayha-cd96c.firebaseapp.com",
+      projectId: "toanthayha-cd96c",
+      storageBucket: "toanthayha-cd96c.firebasestorage.app",
+      messagingSenderId: "940207284081",
+      appId: "1:940207284081:web:9801158f72cc14053ae0d0",
+      measurementId: "G-9D5ZQ66BSB"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // === Lấy dữ liệu từ Firestore theo examCode ===
     async function fetchRows(examCode) {
-  const colRef = collection(db, "quizResults");
-  const q = examCode
-      ? query(colRef, where("examCode", "==", examCode))  // đổi thành examCode
-      : query(colRef);
+      const colRef = collection(db, "quizResults");
+      const q = examCode
+        ? query(colRef, where("examCode", "==", examCode))
+        : query(colRef);
 
-  const snapshot = await getDocs(q);
-  const rows = [];
-  snapshot.forEach(doc => {
-    const d = doc.data() || {};
+      const snapshot = await getDocs(q);
+      const rows = [];
 
-    let submittedAt = "";
-    if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
-      try {
-        submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-      } catch (e) {
-        console.warn("Could not format date for doc:", doc.id, e);
-      }
-    }
+      snapshot.forEach(doc => {
+        const d = doc.data() || {};
+        let submittedAt = "";
+        if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
+          try {
+            submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+          } catch (e) {
+            console.warn("Could not format date for doc:", doc.id, e);
+          }
+        }
 
-    rows.push({
-      "Mã kỳ thi": d.examCode || "",
-      "QuizId": d.quizId || "",
-      "SBD": d.studentId || d.id || "",
-      "Họ và tên": d.fullname || "",
-      "Lớp": d.className || d.class || "",
-      "Trường": d.school || "",
-      "Điểm": typeof d.score === "number" ? d.score : "",
-      "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
-      "Ngày nộp": submittedAt,
-      "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
-    });
-  });
-  
-  return rows;
-}
-    function autoFitColumns(ws, data) {
-        const colWidths = [];
-        const header = Object.keys(data[0] || {});
-        
-        header.forEach((h, i) => {
-            let maxLen = h.length;
-            data.forEach(row => {
-                const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
-                if (val.length > maxLen) {
-                    maxLen = val.length;
-                }
-            });
-            colWidths[i] = { wch: maxLen + 2 };
+        rows.push({
+          "Mã kỳ thi": d.examCode || "",
+          "QuizId": d.quizId || "",
+          "SBD": d.studentId || d.id || "",
+          "Họ và tên": d.fullname || "",
+          "Lớp": d.className || d.class || "",
+          "Trường": d.school || "",
+          "Điểm": typeof d.score === "number" ? d.score : "",
+          "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
+          "Ngày nộp": submittedAt,
+          "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
         });
-        ws["!cols"] = colWidths;
+      });
+
+      return rows;
     }
 
+    // === Tự động giãn cột Excel ===
+    function autoFitColumns(ws, data) {
+      const colWidths = [];
+      const header = Object.keys(data[0] || {});
+      header.forEach((h, i) => {
+        let maxLen = h.length;
+        data.forEach(row => {
+          const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
+          if (val.length > maxLen) maxLen = val.length;
+        });
+        colWidths[i] = { wch: maxLen + 2 };
+      });
+      ws["!cols"] = colWidths;
+    }
+
+    // === Xuất Excel ===
     async function exportExcel() {
       const btn = document.getElementById("exportBtn");
       const examCode = document.getElementById("examCodeInput").value.trim();
-      
+
       btn.disabled = true;
       btn.textContent = "Đang lấy dữ liệu...";
 
       try {
         const rows = await fetchRows(examCode);
-        
+
         if (rows.length === 0) {
-          alert("Không tìm thấy kết quả nào. Vui lòng kiểm tra lại 'Mã Đề' hoặc đảm bảo đã có học sinh nộp bài.");
+          alert("⚠️ Không tìm thấy kết quả nào cho mã kỳ thi: " + examCode);
           return;
         }
 
         btn.textContent = "Đang tạo file...";
 
-        // Sắp xếp lại dữ liệu theo ngày nộp mới nhất
         rows.sort((a, b) => new Date(b["Ngày nộp"]) - new Date(a["Ngày nộp"]));
 
         const ws = XLSX.utils.json_to_sheet(rows);
         autoFitColumns(ws, rows);
-        
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "KetQuaThi");
-        
-        const filename = examCode ? `KetQua_${examCode}.xlsx` : 'KetQua_TatCa.xlsx';        XLSX.writeFile(wb, filename);
+
+        const filename = examCode ? `KetQua_${examCode}.xlsx` : 'KetQua_TatCa.xlsx';
+        XLSX.writeFile(wb, filename);
 
       } catch (err) {
         console.error("Lỗi khi xuất Excel:", err);
-        alert("Đã xảy ra lỗi: " + err.message + ". Hãy kiểm tra lại Quy tắc bảo mật (Rules) trong Firestore của bạn.");
+        alert("Đã xảy ra lỗi: " + err.message + ". Hãy kiểm tra lại Firestore Rules.");
       } finally {
         btn.disabled = false;
         btn.textContent = "Xuất ra Excel";
@@ -143,25 +138,22 @@
 </head>
 <body>
   <div class="card">
-    <h2>Xuất kết quả thi ra Excel!</h2>
-        
+    <h2>Xuất kết quả thi ra Excel</h2>
     <div class="field">
-      <label for="quizIdInput">Lọc theo Mã kỳ thi</label>
+      <label for="examCodeInput">Nhập Mã kỳ thi</label>
       <input type="text" id="examCodeInput" placeholder="Ví dụ: Toan12_001"/>
     </div>
-    
     <button id="exportBtn" class="btn">TẢI FILE</button>
 
     <div class="note">
-        <b>Quan trọng:</b> Nếu bạn gặp lỗi "permission-denied" (quyền bị từ chối), hãy vào dự án Firebase của bạn, chọn <b>Firestore Database</b> > <b>Rules</b> và đảm bảo quy tắc của bạn cho phép đọc dữ liệu, ví dụ:
-        <br>
-        <code>
-            match /databases/{database}/documents { <br>
-            &nbsp;&nbsp;match /{document=**} { <br>
-            &nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true; <br>
-            &nbsp;&nbsp;} <br>
-            }
-        </code>
+      <b>Lưu ý:</b> Nếu thấy "permission-denied", hãy kiểm tra lại <b>Firestore Rules</b>:
+      <pre>
+match /databases/{database}/documents {
+  match /{document=**} {
+    allow read, write: if true;
+  }
+}
+      </pre>
     </div>
   </div>
 </body>
