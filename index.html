@@ -42,41 +42,59 @@
 
     // === Lấy dữ liệu từ Firestore theo examCode ===
     async function fetchRows(examCode) {
-      const colRef = collection(db, "quizResults");
-      const q = examCode
-        ? query(colRef, where("examCode", "==", examCode))
-        : query(colRef);
+  const colRef = collection(db, "quizResults");
+  const q = examCode
+      ? query(colRef, where("examCode", "==", examCode))
+      : query(colRef);
 
-      const snapshot = await getDocs(q);
-      const rows = [];
+  const snapshot = await getDocs(q);
+  const rows = [];
+  snapshot.forEach(doc => {
+    const d = doc.data() || {};
 
-      snapshot.forEach(doc => {
-        const d = doc.data() || {};
-        let submittedAt = "";
-        if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
-          try {
-            submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-          } catch (e) {
-            console.warn("Could not format date for doc:", doc.id, e);
-          }
-        }
-
-        rows.push({
-          "Mã kỳ thi": d.examCode || "",
-          "QuizId": d.quizId || "",
-          "SBD": d.studentId || d.id || "",
-          "Họ và tên": d.fullname || "",
-          "Lớp": d.className || d.class || "",
-          "Trường": d.school || "",
-          "Điểm": typeof d.score === "number" ? d.score : "",
-          "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
-          "Ngày nộp": submittedAt,
-          "Chi tiết câu trả lời": JSON.stringify(d.answers.q1 || {})
-        });
-      });
-
-      return rows;
+    let submittedAt = "";
+    if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
+      try {
+        submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+      } catch (e) {
+        console.warn("Could not format date for doc:", doc.id, e);
+      }
     }
+
+    // Tạo 1 object kết quả cho từng học sinh
+    const row = {
+      "Mã kỳ thi": d.examCode || "",
+      "QuizId": d.quizId || "",
+      "SBD": d.studentId || d.id || "",
+      "Họ và tên": d.fullname || "",
+      "Lớp": d.className || d.class || "",
+      "Trường": d.school || "",
+      "Điểm": typeof d.score === "number" ? d.score : "",
+      "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
+      "Ngày nộp": submittedAt
+    };
+
+    // Nếu có answers thì duyệt hết q1, q2, q3...
+    if (d.answers) {
+      const keys = Object.keys(d.answers);
+      const totalQuestions = keys.length; // hoặc bạn đặt cố định số câu, ví dụ 20
+
+      for (let i = 1; i <= totalQuestions; i++) {
+        const key = "q" + i;
+        if (d.answers.hasOwnProperty(key)) {
+          row[`Trả lời ${i}`] = d.answers[key] !== null ? JSON.stringify(d.answers[key]) : "Chưa trả lời";
+        } else {
+          row[`Trả lời ${i}`] = "Chưa trả lời";
+        }
+      }
+    }
+
+    rows.push(row);
+  });
+  
+  return rows;
+}
+
 
     // === Tự động giãn cột Excel ===
     function autoFitColumns(ws, data) {
