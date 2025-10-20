@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -125,8 +126,7 @@
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "KetQuaThi");
         
-        const filename = examCode ? `KetQua_${quizId}.xlsx` : 'KetQua_TatCa.xlsx';
-        XLSX.writeFile(wb, filename);
+        const filename = examCode ? `KetQua_${examCode}.xlsx` : 'KetQua_TatCa.xlsx';        XLSX.writeFile(wb, filename);
 
       } catch (err) {
         console.error("Lỗi khi xuất Excel:", err);
