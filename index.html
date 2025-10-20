@@ -47,42 +47,41 @@
     const db = getFirestore(app);
 
     async function fetchRows(examCode) {
-      const colRef = collection(db, "examCodeResults");
-      const q = examCode
-          ? query(colRef, where("examCode", "==", examCode))
-          : query(colRef); // Lấy tất cả nếu không có examCode
-      const snapshot = await getDocs(q);
-      const rows = [];
-      snapshot.forEach(doc => {
-        const d = doc.data() || {};
-        
-        // Xử lý ngày tháng an toàn hơn
-        let submittedAt = "";
-        if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
-            try {
-                submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-            } catch (e) {
-                console.warn("Could not format date for doc:", doc.id, e);
-            }
-        }
+  const colRef = collection(db, "quizResults");
+  const q = examCode
+      ? query(colRef, where("examCode", "==", examCode))  // đổi thành examCode
+      : query(colRef);
 
-        rows.push({
-          "Mã bài": d.examCode || "",
-	  "QuizId": d.quizId || "",
-          "SBD": d.studentId || d.id || "",
-          "Họ và tên": d.fullname || "",
-          "Lớp": d.className || d.class || "",
-          "Trường": d.school || "",
-          "Điểm": typeof d.score === "number" ? d.score : "",
-          "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
-          "Ngày nộp": submittedAt,
-          "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
-        });
-      });
-      
-      return rows;
+  const snapshot = await getDocs(q);
+  const rows = [];
+  snapshot.forEach(doc => {
+    const d = doc.data() || {};
+
+    let submittedAt = "";
+    if (d.submittedAt && typeof d.submittedAt.toDate === "function") {
+      try {
+        submittedAt = d.submittedAt.toDate().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+      } catch (e) {
+        console.warn("Could not format date for doc:", doc.id, e);
+      }
     }
 
+    rows.push({
+      "Mã kỳ thi": d.examCode || "",
+      "QuizId": d.quizId || "",
+      "SBD": d.studentId || d.id || "",
+      "Họ và tên": d.fullname || "",
+      "Lớp": d.className || d.class || "",
+      "Trường": d.school || "",
+      "Điểm": typeof d.score === "number" ? d.score : "",
+      "Thời gian làm(giây)": typeof d.timeTaken === "number" ? d.timeTaken : "",
+      "Ngày nộp": submittedAt,
+      "Chi tiết câu trả lời": JSON.stringify(d.answers || {})
+    });
+  });
+  
+  return rows;
+}
     function autoFitColumns(ws, data) {
         const colWidths = [];
         const header = Object.keys(data[0] || {});
